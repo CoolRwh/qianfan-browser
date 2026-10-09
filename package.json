@@ -1,0 +1,19 @@
+{
+  "name": "qianfan-browser",
+  "version": "1.0.0",
+  "private": true,
+  "description": "千帆多账号浏览器管理器",
+  "author": "Qianfan",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --config electron-builder.cjs --win --x64 --publish never",
+    "pack:win": "electron-builder --config electron-builder.cjs --win --x64 --dir --publish never",
+    "test": "node --test",
+    "check": "node --check src/main.js && node --check src/store.js && node --check src/renderer.js && node --check src/preload.js && node --check src/cloud-mail.js && node --check src/mail-renderer.js && node --check src/ui.js"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "^26.15.3"
+  }
+}

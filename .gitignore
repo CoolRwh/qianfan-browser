@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.log
+.smoke-data/
+.mail-smoke-data/
+.design-smoke-data/
+.packaged-smoke-data/
