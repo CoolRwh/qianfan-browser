@@ -1,0 +1,100 @@
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Validate version tag
+        run: |
+          $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          if ($env:RELEASE_TAG -cne "v$version") {
+            throw "Tag must match package.json version: expected v$version"
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
+            throw 'Unsupported release version'
+          }
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Electron runtime
+        run: node node_modules/electron/install.js
+
+      - name: Check JavaScript
+        run: npm run check
+
+      - name: Run tests
+        run: npm test
+
+      - name: Generate Windows icons
+        run: ./scripts/create-icon.ps1
+
+      - name: Build Windows x64 packages
+        run: npm run build:win
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          $assets = @(
+            "dist/QianfanBrowser-Setup-$version-x64.exe",
+            "dist/QianfanBrowser-Portable-$version-x64.exe"
+          )
+          $checksums = foreach ($asset in $assets) {
+            if (!(Test-Path -LiteralPath $asset -PathType Leaf)) { throw "Missing asset: $asset" }
+            $hash = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $([System.IO.Path]::GetFileName($asset))"
+          }
+          $checksums | Set-Content -LiteralPath dist/SHA256SUMS.txt -Encoding utf8NoBOM
+          @(
+            "千帆浏览器 $env:RELEASE_TAG · Windows x64",
+            '',
+            '- Setup：安装版，可选择安装目录。',
+            '- Portable：便携版，无需安装。',
+            '- SHA256SUMS.txt：安装文件的 SHA-256 校验值。',
+            '',
+            '账号和登录状态保存在本机，升级前建议备份 %APPDATA%/qianfan-browser。',
+            '当前安装包未配置代码签名。'
+          ) | Set-Content -LiteralPath dist/release-notes.md -Encoding utf8NoBOM
+          $releaseArgs = @(
+            'release', 'create', $env:RELEASE_TAG,
+            '--verify-tag', '--title', "千帆浏览器 $env:RELEASE_TAG",
+            '--notes-file', 'dist/release-notes.md'
+          )
+          if ($version.Contains('-')) { $releaseArgs += @('--prerelease', '--latest=false') }
+          else { $releaseArgs += '--latest' }
+          $releaseArgs += $assets
+          $releaseArgs += 'dist/SHA256SUMS.txt'
+          & gh @releaseArgs
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub release publication failed. Check the release and logs before retrying.' }

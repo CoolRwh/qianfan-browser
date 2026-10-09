@@ -5,3 +5,9 @@ dist/
 .mail-smoke-data/
 .design-smoke-data/
 .packaged-smoke-data/
+.env
+.env.*
+config.yml
+cloud-mail.json
+accounts.json
+accounts-v1-backup.json

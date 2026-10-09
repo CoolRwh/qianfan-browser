@@ -30,6 +30,31 @@ npm run build:win
 
 账号、登录状态和邮箱配置继续保存在 `%APPDATA%/qianfan-browser`，源码版、安装版和便携版使用同一目录；便携版数据不放在 exe 旁边。卸载默认保留数据。构建仅包含运行源码和图标，不包含测试账号、日志、截图或邮箱配置。Windows 图标资源由 `scripts/create-icon.ps1` 生成，修改图标后可重新运行该脚本再打包。
 
+## GitHub 自动打包和发布
+
+已配置 `.github/workflows/release-windows.yml`。将源码提交到自己的 GitHub 仓库后，推送 `v` 开头且与 `package.json` 版本完全一致的标签，即触发 Windows x64 打包和 Releases 发布。
+
+第一次发布（当前版本为 `1.0.0`），先确保代码已提交并推送，再运行：
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+打开仓库的 Actions → Release Windows 查看进度。成功后，Releases 自动出现安装版、便携版和 `SHA256SUMS.txt`。检查和打包失败时不会发布。工作流使用 GitHub 自动提供的 `GITHUB_TOKEN`，已声明 `contents: write`，无需添加个人 Token。仓库需允许 GitHub Actions 运行；组织策略若限制 Actions 或令牌写权限，需要管理员允许。
+
+后续发布示例（在干净的 Git 工作区中执行，示例默认分支为 `main`）：
+
+```powershell
+npm version patch
+git push origin main
+git push origin v1.0.1
+```
+
+`npm version patch` 同步更新版本文件并创建版本提交和标签；上面的标签应替换为本次实际版本。预发布版本如 `1.1.0-beta.1` 对应标签 `v1.1.0-beta.1`，自动标记为 Pre-release，不覆盖 Latest。普通代码推送不触发发布。已经发布的标签不要复用；如发布失败，先检查 Actions 日志与 Releases 草稿状态再重试。
+
+源码需包含 `.github`、`src`、`build`、`scripts`、`test`、`package.json`、`package-lock.json` 和 `electron-builder.cjs`。不提交 `node_modules`、`dist`、本地账号数据或敏感配置；忽略规则已加入 `.env`、`.env.*`、`config.yml`。忽略规则不会移除之前已经被 Git 跟踪的文件，提交前需检查暂存列表。工作流仅上传两个明确命名的安装文件及校验文件。
+
 ## 使用
 
 左侧「管理网站」可新增网站，设置自定义名称和默认页面地址。同一域名只创建一个网站，所有账号按所属网站归组；左侧可切换单个网站，搜索支持账号、备注、网站名称和域名。分组标题旁的编辑按钮可修改网站名称或同域名下的默认页面。已有账号的网站不允许换域名；只有空网站可移除，避免误删账号。
@@ -44,7 +69,7 @@ npm run build:win
 
 账号元数据保存在 Electron `userData` 目录的 `accounts.json` 中，登录状态由 `persist:account-<UUID>` 分区保存在同目录。Windows 通常为 `%APPDATA%/qianfan-browser`。数据不上传云端。删除账号需在原生确认框中确认，将关闭窗口并清除该分区的 Cookie、网站存储和缓存。
 
-远程页面关闭 Node.js 集成、启用上下文隔离和沙箱，不加载管理器 preload，无法调用账号管理 IPC。网址仅允许 HTTP/HTTPS。相机、麦克风、定位等网站权限默认拒绝。暂未实现下载管理、代理、扩展和安装包构建。
+远程页面关闭 Node.js 集成、启用上下文隔离和沙箱，不加载管理器 preload，无法调用账号管理 IPC。网址仅允许 HTTP/HTTPS。相机、麦克风、定位等网站权限默认拒绝。暂未实现下载管理、代理和扩展。
 
 ## Cloud Mail 邮箱生成与验证码
 
